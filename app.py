@@ -14,6 +14,7 @@ from backend.evaluation import run_evaluation
 ROOT = Path(__file__).resolve().parent
 DIST = ROOT / 'frontend' / 'dist'
 app = Flask(__name__, static_folder=str(DIST), static_url_path='')
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024
 
 allowed_origins = [x.strip() for x in os.getenv('CORS_ORIGINS', '').split(',') if x.strip()]
 if allowed_origins:
@@ -25,6 +26,22 @@ limiter = Limiter(
     default_limits=['120 per minute'],
     storage_uri=os.getenv('RATELIMIT_STORAGE_URI', 'memory://'),
 )
+
+
+@app.after_request
+def add_security_headers(response):
+    response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    response.headers.setdefault('X-Frame-Options', 'DENY')
+    response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
+    response.headers.setdefault('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+    response.headers.setdefault(
+        'Content-Security-Policy',
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; "
+        "base-uri 'self'; frame-ancestors 'none'"
+    )
+    return response
+
 
 init_db()
 seed_transactions(500)
