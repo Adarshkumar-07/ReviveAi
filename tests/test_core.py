@@ -5,6 +5,7 @@ os.environ['LLM_PROVIDER'] = 'mock'
 from backend.db import init_db, reset_simulation, seed_transactions, get_transaction
 from backend.policy import validate
 from backend.decision import decide_transaction
+from app import app
 
 
 def setup_function():
@@ -48,3 +49,26 @@ def test_reset_clears_previous_simulation_events():
     reset_simulation()
     with conn() as c:
         assert c.execute('SELECT COUNT(*) FROM audit_logs').fetchone()[0] == 0
+
+
+def test_security_headers_are_present():
+    client = app.test_client()
+    response = client.get('/api/health')
+    assert response.status_code == 200
+    assert response.headers['X-Content-Type-Options'] == 'nosniff'
+    assert response.headers['X-Frame-Options'] == 'DENY'
+    assert response.headers['Referrer-Policy'] == 'strict-origin-when-cross-origin'
+    assert 'default-src' in response.headers['Content-Security-Policy']
+    assert response.headers['Permissions-Policy'] == 'camera=(), microphone=(), geolocation=()'
+
+
+def test_request_body_limit_is_configured():
+    assert app.config['MAX_CONTENT_LENGTH'] == 16 * 1024
+
+
+def test_recovery_index_prevents_duplicate_execution():
+    from backend.recovery import simulate_recovery
+    result = simulate_recovery('RV-10000')
+    if result['status'] in {'recovered', 'failed'}:
+        duplicate = simulate_recovery('RV-10000')
+        assert duplicate['status'] == 'duplicate'
