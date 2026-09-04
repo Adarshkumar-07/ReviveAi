@@ -1,3 +1,4 @@
+import os
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from pathlib import Path
@@ -9,9 +10,25 @@ from backend.evaluation import run_evaluation
 ROOT = Path(__file__).resolve().parent
 DIST = ROOT / 'frontend' / 'dist'
 app = Flask(__name__, static_folder=str(DIST), static_url_path='')
-CORS(app)
+
+allowed_origins = [x.strip() for x in os.getenv('CORS_ORIGINS', '').split(',') if x.strip()]
+if allowed_origins:
+    CORS(app, origins=allowed_origins)
+
 init_db()
 seed_transactions(500)
+
+
+def json_body():
+    payload = request.get_json(silent=True)
+    return payload if isinstance(payload, dict) else {}
+
+
+def parse_count(payload):
+    value = payload.get('count', 500)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError('count must be an integer')
+    return min(max(value, 50), 5000)
 
 
 @app.get('/api/health')
@@ -26,8 +43,11 @@ def metrics():
 
 @app.get('/api/transactions')
 def transactions():
-    limit = min(max(int(request.args.get('limit', 30)), 1), 100)
-    return jsonify(get_transactions(limit))
+    try:
+        limit = int(request.args.get('limit', 30))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'limit must be an integer'}), 400
+    return jsonify(get_transactions(min(max(limit, 1), 100)))
 
 
 @app.get('/api/transactions/<tx_id>')
@@ -38,31 +58,41 @@ def transaction(tx_id):
 
 @app.post('/api/transactions/seed')
 def seed():
-    count = min(max(int((request.json or {}).get('count', 500)), 50), 5000)
+    try:
+        count = parse_count(json_body())
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
     seed_transactions(count, reset=True)
     return jsonify({'transactions': count, 'metrics': get_metrics()})
 
 
 @app.post('/api/decide')
 def decide():
-    tx_id = (request.json or {}).get('transaction_id')
-    if not tx_id:
-        return jsonify({'error': 'transaction_id required'}), 400
-    result = decide_transaction(tx_id)
+    tx_id = json_body().get('transaction_id')
+    if not isinstance(tx_id, str) or not tx_id.strip() or len(tx_id) > 64:
+        return jsonify({'error': 'valid transaction_id required'}), 400
+    result = decide_transaction(tx_id.strip())
     return jsonify(result), 200 if 'error' not in result else 404
 
 
 @app.post('/api/recover')
 def recover():
-    payload = request.json or {}
-    if not payload.get('transaction_id'):
-        return jsonify({'error': 'transaction_id required'}), 400
-    return jsonify(simulate_recovery(payload['transaction_id'], bool(payload.get('approved', False))))
+    payload = json_body()
+    tx_id = payload.get('transaction_id')
+    if not isinstance(tx_id, str) or not tx_id.strip() or len(tx_id) > 64:
+        return jsonify({'error': 'valid transaction_id required'}), 400
+    approved = payload.get('approved', False)
+    if not isinstance(approved, bool):
+        return jsonify({'error': 'approved must be boolean'}), 400
+    return jsonify(simulate_recovery(tx_id.strip(), approved))
 
 
 @app.post('/api/simulate')
 def simulate():
-    count = min(max(int((request.json or {}).get('count', 500)), 50), 5000)
+    try:
+        count = parse_count(json_body())
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
     seed_transactions(count, reset=True)
     return jsonify({
         'metrics': get_metrics(),
@@ -92,4 +122,4 @@ def frontend(path):
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=os.getenv('FLASK_DEBUG') == '1')
