@@ -2,6 +2,6 @@ services:
   - type: web
     name: reviveai
     runtime: python
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r requirements.txt && cd frontend && npm install && npm run build
     startCommand: gunicorn app:app
     plan: free
