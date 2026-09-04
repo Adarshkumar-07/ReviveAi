@@ -1,7 +1,11 @@
 import os
+from pathlib import Path
+
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
-from pathlib import Path
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
 from backend.db import init_db, seed_transactions, get_transactions, get_transaction, get_metrics, get_audit
 from backend.decision import decide_transaction
 from backend.recovery import simulate_recovery
@@ -14,6 +18,13 @@ app = Flask(__name__, static_folder=str(DIST), static_url_path='')
 allowed_origins = [x.strip() for x in os.getenv('CORS_ORIGINS', '').split(',') if x.strip()]
 if allowed_origins:
     CORS(app, origins=allowed_origins)
+
+limiter = Limiter(
+    key_func=get_remote_address,
+    app=app,
+    default_limits=['120 per minute'],
+    storage_uri=os.getenv('RATELIMIT_STORAGE_URI', 'memory://'),
+)
 
 init_db()
 seed_transactions(500)
@@ -32,6 +43,7 @@ def parse_count(payload):
 
 
 @app.get('/api/health')
+@limiter.exempt
 def health():
     return jsonify({'status': 'ok', 'mode': 'SIMULATION / TEST MODE'})
 
@@ -57,6 +69,7 @@ def transaction(tx_id):
 
 
 @app.post('/api/transactions/seed')
+@limiter.limit('10 per minute')
 def seed():
     try:
         count = parse_count(json_body())
@@ -67,6 +80,7 @@ def seed():
 
 
 @app.post('/api/decide')
+@limiter.limit('30 per minute')
 def decide():
     tx_id = json_body().get('transaction_id')
     if not isinstance(tx_id, str) or not tx_id.strip() or len(tx_id) > 64:
@@ -76,6 +90,7 @@ def decide():
 
 
 @app.post('/api/recover')
+@limiter.limit('20 per minute')
 def recover():
     payload = json_body()
     tx_id = payload.get('transaction_id')
@@ -88,6 +103,7 @@ def recover():
 
 
 @app.post('/api/simulate')
+@limiter.limit('5 per minute')
 def simulate():
     try:
         count = parse_count(json_body())
