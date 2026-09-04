@@ -1,65 +1,25 @@
 # ReviveAI
 
-> **Recover the right revenue. Automatically. Safely. Measurably.**
+**AI Revenue Recovery Agent**  
+**Recover the right revenue. Automatically. Safely. Measurably.**
 
-ReviveAI is an AI-inspired revenue recovery operations agent for merchants. It detects failed revenue, diagnoses likely causes, estimates recovery probability, proposes an intervention, validates the intervention through deterministic policies, and records an auditable outcome.
+ReviveAI is a merchant revenue-recovery command center for Razorpay AI Buildathon **Track 03 — AI Revenue Recovery**. It combines a trained recovery-probability model, LLM reasoning, deterministic financial policies, simulated execution, measurement and an audit trail.
 
-## Razorpay AI Buildathon — Track 03: AI Revenue Recovery
+## Problem
 
-### The problem
-Failed payments are not all equally recoverable. Blind retries can create customer friction, waste attempts, and still miss high-value opportunities. Merchants need a system that answers three questions:
+Every failed payment is not equally recoverable. Blind retries can waste attempts, increase customer friction and miss high-value opportunities. Merchants need to know **which revenue is worth pursuing, why it failed, what intervention is safest, and when to stop**.
 
-1. Which revenue is genuinely at risk?
-2. What is the safest next intervention?
-3. When should the system stop and escalate?
+## Solution
 
-### What ReviveAI does
+ReviveAI follows:
 
 `DETECT → DIAGNOSE → PREDICT → DECIDE → VALIDATE → RECOVER → MEASURE → AUDIT`
 
-- Revenue-at-risk identification
-- Failure-cause diagnosis
-- Recovery probability scoring
-- Recommended recovery action
-- Deterministic financial guardrails
-- High-value human approval gate
-- Retry/stopping rules
-- Batch simulation and business metrics
-- Explainable decision panel
-- Audit-ready recovery events
-- Baseline vs ReviveAI evaluation
-
-## Architecture
-
-```text
-Payment / Merchant Events
-          |
-          v
-   Risk & Context Engine
-          |
-          v
-    AI Decision Layer
-          |
-          v
- Deterministic Policy Engine
-     |              |
-     v              v
- Auto Action     Human Approval
-     |              |
-     +-------> Execution Simulator
-                    |
-                    v
-             Outcome + Audit Log
-                    |
-                    v
-              Recovery Metrics
-```
-
-### Why the policy engine is separate
-
-The AI layer can recommend an action, but it cannot bypass financial safety rules. Amount thresholds, retry limits, cooldowns, and escalation are deterministic. This keeps the prototype explainable and bounded.
+The ML model estimates recovery probability. The LLM diagnoses the event and recommends an intervention. A deterministic policy engine validates or blocks that recommendation. Only approved actions reach the simulation layer.
 
 ## Demo
+
+The dashboard is intentionally built as an operations product rather than a chatbot. It includes a live recovery queue, decision trace, policy status, recovery execution, batch evaluation and safety posture.
 
 Run locally:
 
@@ -68,54 +28,192 @@ pip install -r requirements.txt
 python app.py
 ```
 
-Open `http://localhost:5000`.
+In another terminal:
 
-The dashboard runs without paid APIs or API keys and includes deterministic synthetic transaction data. The **Run 500-event simulation** button produces a reproducible evaluation-style demo.
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-## API
+The app works without a paid API. Set `LLM_PROVIDER` and `LLM_API_KEY` only when connecting a compatible LLM adapter.
 
-- `GET /api/metrics` — current recovery metrics
-- `GET /api/transactions?limit=30` — recovery queue
-- `POST /api/simulate` — generate a new batch (`count` 50–5000)
-- `POST /api/recover` — evaluate a recovery workflow against policy guardrails
+## Architecture
 
-## Evaluation methodology
+```text
+Merchant / Payment Events
+          ↓
+      SQLite Store
+          ↓
+ Random Forest Risk Model
+          ↓
+      LLM Reasoning
+   Diagnose + Recommend
+          ↓
+   Deterministic Policy
+   ┌──────┴────────┐
+   ↓               ↓
+Approved       Approval/Stop
+   ↓               ↓
+Simulation     Human Gate
+   └──────┬────────┘
+          ↓
+ Recovery Event + Audit
+          ↓
+ Revenue & Evaluation Metrics
+```
 
-The prototype compares a simple rule-based baseline with ReviveAI's policy-controlled recovery strategy. The dashboard reports:
+## AI Decision Pipeline
 
+1. **Detect** failed revenue events.
+2. **Predict** recovery probability using Random Forest.
+3. **Diagnose** the failure using an LLM adapter or clearly labelled deterministic fallback.
+4. **Recommend** the safest next intervention.
+5. **Validate** the recommendation through deterministic policy.
+6. **Execute** only in simulation/test mode.
+7. **Measure** recovery and lift against a baseline.
+8. **Audit** every decision and execution event.
+
+## Policy Engine
+
+The policy layer is independent from AI and can override AI recommendations.
+
+- Autonomous amount threshold: ₹10,000
+- Retry limit: 2 prior attempts
+- Minimum recovery probability: 35%
+- Expired card → payment-method update
+- Authentication required → re-authentication
+- Insufficient funds → payment link / wait
+- Unknown cause → human approval
+- Duplicate execution → blocked
+- No real payment is charged
+
+## Dataset
+
+The project uses reproducible **synthetic transaction data** containing amount, failure reason, payment method, attempts, customer age, historical success rate, prior failures, time since failure and subscription state.
+
+The dataset is generated deterministically so the same demo can be reproduced. Synthetic labels are generated from a transparent latent recovery process with controlled randomness.
+
+## Evaluation Methodology
+
+The Random Forest is evaluated using a strict split:
+
+- 70% training
+- 15% validation for threshold selection
+- 15% held-out test set
+
+The validation set selects the decision threshold using F1. The held-out test set is not used for tuning.
+
+The dashboard also compares expected recovered revenue against a simple transient-failure retry baseline rather than fabricating a fixed improvement percentage.
+
+## Results
+
+Results are generated by the repository's evaluation endpoint and dashboard. Metrics include:
+
+- ROC-AUC
+- Precision
+- Recall
+- F1
 - Revenue at risk
 - AI-qualified recoverable revenue
-- Revenue recovered
-- Recovery rate
-- Baseline recovery
+- Expected recovered revenue
+- Baseline expected recovered revenue
 - Recovery lift
-- Autonomous actions
-- Human approvals
-- Safely stopped opportunities
-- Policy violations
 
-The included data is synthetic. Reported recovery amounts are **simulation results**, not production financial performance.
+**Important:** the dataset is synthetic and execution is simulated/test-mode. These results demonstrate system behavior and evaluation methodology, not production financial performance.
 
-## Safety / limitations
+## Failure Cases
 
-- No real customer money is charged by this repository.
-- The demo uses synthetic transaction data.
-- Recovery execution is simulated unless separately connected to an authorized test environment.
-- AI recommendations are constrained by deterministic policy rules.
-- Production deployment would require merchant authorization, secure secrets management, idempotency, rate limits, observability, compliance review, and Razorpay-approved integration patterns.
+ReviveAI intentionally does not force recovery when:
 
-## Tech stack
+- the probability is below threshold;
+- retry limits are reached;
+- a payment method must be updated;
+- customer authentication is required;
+- the transaction exceeds the autonomous amount threshold;
+- the failure reason is ambiguous;
+- a duplicate recovery is detected.
 
-- Python / Flask
-- Vanilla JavaScript
-- HTML / CSS
-- Gunicorn for deployment
-- No database required for the demo
-- No paid API required
+## Safety & Guardrails
 
-## Buildathon positioning
+AI proposes; deterministic policy decides. Financial execution is never delegated directly to an LLM. Every decision records the probability, diagnosis, recommendation, final action and policy outcome. The demo is explicitly simulation/test mode and contains no real-money charging path.
 
-ReviveAI is designed around measurable financial outcomes rather than chatbot activity. Its central KPI is **revenue recovered**, while its safety model makes every automated action bounded, explainable, and auditable.
+## Setup
+
+### Backend
+
+```bash
+pip install -r requirements.txt
+python app.py
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### Production-style single service
+
+Render builds the Vite frontend and runs Flask/Gunicorn. The Flask app serves `frontend/dist` after the frontend build.
+
+## API Documentation
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/health` | Health + mode |
+| GET | `/api/metrics` | Recovery KPIs |
+| GET | `/api/transactions` | Recovery queue |
+| GET | `/api/transactions/<id>` | Transaction detail |
+| POST | `/api/transactions/seed` | Reset synthetic dataset |
+| POST | `/api/decide` | ML + LLM + policy decision |
+| POST | `/api/recover` | Simulated/test execution |
+| POST | `/api/simulate` | Run a fresh batch |
+| GET | `/api/evaluation` | Evaluation metrics |
+| GET | `/api/audit` | Audit events |
+
+## Screenshots
+
+Add final dashboard screenshots here after the first successful local/Render build.
+
+## Demo Video
+
+Record the 5-minute flow required for submission:
+
+`Problem → ReviveAI → live decision → policy gate → simulated recovery → batch evaluation → architecture → measurable impact`
+
+## Future Work
+
+- Razorpay test-mode integration
+- Human approval queue UI
+- Email/WhatsApp recovery simulations
+- Multi-merchant policy profiles
+- Real-time event ingestion
+- Online model monitoring and drift detection
+
+## Known Limitations
+
+- Synthetic data does not represent production merchant distributions.
+- LLM reasoning defaults to a deterministic fallback when no API key is configured.
+- Recovery execution is simulated and cannot charge real money.
+- Expected revenue lift is an evaluation estimate, not a production guarantee.
+
+## Tech Stack
+
+- **Frontend:** React + Vite
+- **Backend:** Python + Flask
+- **AI:** LLM API adapter with no-cost fallback
+- **ML:** scikit-learn Random Forest
+- **Database:** SQLite
+- **Async:** Celery/Redis intentionally deferred until core product stability
+- **Deployment:** Render
+- **Data:** Synthetic transaction dataset
+
+## Buildathon Positioning
+
+ReviveAI is designed around the Track 03 requirement to detect revenue at risk, choose the right intervention, execute bounded recovery workflows and demonstrate measurable recovered revenue. The key product idea is simple: **do not recover every failed payment — recover the right ones, and prove why.**
 
 ## License
 
