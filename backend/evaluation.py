@@ -1,20 +1,20 @@
 from .db import get_transactions
-from .ml import train, METRICS, predict, latent_probability
+from . import ml
 
 
 def run_evaluation(n=500):
     rows = get_transactions(min(n, 5000))
-    train()
+    ml.train()
     eligible = [r for r in rows if r['attempts'] <= 2]
-    predictions = {r['id']: predict(r) for r in eligible}
+    predictions = {r['id']: ml.predict(r) for r in eligible}
 
     # Independent synthetic outcomes. These are never generated from the model score.
     outcomes = {
-        r['id']: int(__import__('random').Random(sum(map(ord, r['id']))).random() < latent_probability(r))
+        r['id']: int(__import__('random').Random(sum(map(ord, r['id']))).random() < ml.latent_probability(r))
         for r in eligible
     }
 
-    threshold = METRICS.get('threshold', .35)
+    threshold = ml.METRICS.get('threshold', .35)
     qualified = [r for r in eligible if predictions[r['id']] >= threshold]
     strategy_recovered = sum(r['amount'] * outcomes[r['id']] for r in qualified)
 
@@ -41,5 +41,5 @@ def run_evaluation(n=500):
         'baseline_expected_revenue': round(baseline_recovered, 2),
         'recovery_lift_pct': round(lift, 1),
         'evaluation_note': 'Synthetic held-out-style outcomes generated independently from model predictions; not production performance.',
-        'ml': METRICS
+        'ml': ml.METRICS
     }
