@@ -3,7 +3,18 @@
 **AI Revenue Recovery Agent**  
 **Recover the right revenue. Automatically. Safely. Measurably.**
 
+**Team:** Cyber Sage  
+**Track:** Track 03 — AI Revenue Recovery
+
 ReviveAI is a merchant revenue-recovery command center for Razorpay AI Buildathon **Track 03 — AI Revenue Recovery**. It combines a trained recovery-probability model, optional OpenAI reasoning, deterministic financial policies, simulated execution, measurement and an audit trail.
+
+## Team Cyber Sage
+
+| Member | Role | Contribution |
+|---|---|---|
+| **Adarsh Kumar** | Backend & AI Integration | Flask backend, AI/LLM orchestration, policy-engine integration, API development, recovery workflow integration, testing and QA |
+| **Rohan Sharma** | Frontend & Product | React/Vite dashboard, transaction views, Decision Trace UI, responsive design, user workflow and frontend testing |
+| **Dhruv** | ML, Evaluation & Documentation | Recovery-probability ML model, synthetic dataset/evaluation, recovery metrics, audit/evaluation analysis, documentation and demo preparation |
 
 ## Problem
 
@@ -53,8 +64,6 @@ If no key is configured, ReviveAI automatically uses a clearly labelled determin
 ```text
 Merchant / Payment Events
           ↓
-      SQLite Store
-          ↓
  Random Forest Risk Model
           ↓
       LLM Reasoning
@@ -72,6 +81,8 @@ Simulation     Human Gate
           ↓
  Revenue & Evaluation Metrics
 ```
+
+**Core principle:** `LLM proposes → Policy Engine validates → Recovery executes → Audit measures`
 
 ## AI Decision Pipeline
 
@@ -207,7 +218,7 @@ Add final dashboard screenshots here after the first successful local/Render bui
 
 Record the 5-minute flow required for submission:
 
-`Problem → ReviveAI → live decision → policy gate → simulated recovery → batch evaluation → architecture → measurable impact`
+`Problem → ReviveAI → live decision → policy gate → simulated recovery → safety checks → architecture → measurable impact`
 
 ## Future Work
 
